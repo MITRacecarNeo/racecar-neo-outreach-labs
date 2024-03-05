@@ -1,7 +1,7 @@
 """
 MIT BWSI Autonomous RACECAR
 MIT License
-bwsix RC101 - Fall 2023
+racecar-neo-outreach-labs
 
 File Name: lab_f.py
 

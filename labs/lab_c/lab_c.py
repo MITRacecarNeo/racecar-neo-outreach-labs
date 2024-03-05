@@ -1,7 +1,7 @@
 """
 MIT BWSI Autonomous RACECAR
 MIT License
-bwsix RC101 - Fall 2023
+racecar-neo-outreach-labs
 
 File Name: lab_c.py
 
@@ -82,22 +82,22 @@ def update():
     # right trigger is pressed, the RACECAR moves forward at the designated speed.
     # when the left trigger is pressed, the RACECAR moves backward at the designated speed.
     if rc.controller.get_trigger(rc.controller.Trigger._____) > _____:
-      speed = _____
+        speed = _____
     elif rc.controller.get_trigger(rc.controller.Trigger._____) > _____:
-      speed = _____
+        speed = _____
     else:
-      speed = 0
+        speed = 0
       
     # TODO Part 2: Modify the following conditional statement such that when the
     # value of the left joystick's x-axis is greater than 0, the RACECAR's wheels turn right.
     # When the value of the left joystick's x-axis is less than 0, the RACECAR's wheels turn left.
     (x, y) = rc.controller.get_joystick(rc.controller.Joystick._____)
     if x > 0.5:
-      angle = _____
+        angle = _____
     elif x < 0.5:
-      angle = -_____
+        angle = -_____
     else:
-      speed = 0
+        speed = 0
 
     # TODO Part 3: Write a conditional statement such that when the
     # "A" button is pressed, increase the speed of the RACECAR. When the "B" button is pressed,

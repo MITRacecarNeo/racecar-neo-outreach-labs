@@ -63,26 +63,26 @@ def update():
 
     # This prints a message every time the A button is pressed on the controller
     if rc.controller.was_pressed(rc.controller.Button.A):
-      print("The A button was pressed")
+        print("The A button was pressed")
 
     # Reset the counter and start driving in an L every time the B button is pressed on
     # the controller
     if rc.controller.was_pressed(rc.controller.Button.B):
-      counter = 0
-      isDriving = True # Toggle Variable
+        counter = 0
+        isDriving = True # Toggle Variable
 
     if isDriving:
-      # rc.get_delta_time() gives the time in seconds since the last time
-      # the update function was called
-      counter += rc.get_delta_time()
+        # rc.get_delta_time() gives the time in seconds since the last time
+        # the update function was called
+        counter += rc.get_delta_time()
 
-      if counter < 1:
+    if counter < 1:
         # Drive forward at full speed for one second
         rc.drive.set_speed_angle(1, 0)
-      elif counter < 2:
+    elif counter < 2:
         # Turn right at full speed for the next second
         rc.drive.set_speed_angle(1, 1)
-      else:
+    else:
         # Otherwise, stop the car
         rc.drive.stop()
         isDriving = False

@@ -1,7 +1,7 @@
 """
 MIT BWSI Autonomous RACECAR
 MIT License
-bwsix RC101 - Fall 2023
+racecar-neo-outreach-labs
 
 File Name: grand_prix.py
 
@@ -15,7 +15,7 @@ Once the start button is pressed, the RACECAR must drive through the course unti
 reaches the white cone at the end, in which it will then stop. You are disqualified if
 you stop too far from the cone or hit the cone.
 
-Note:  There is no template code in this document to follow except for the RACECAR script 
+Note: There is no template code in this document to follow except for the RACECAR script 
 structure found in template.py. You are expected to use code written from previous labs
 to complete this challenge. Good luck!
 
