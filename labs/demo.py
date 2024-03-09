@@ -76,16 +76,16 @@ def update():
         # the update function was called
         counter += rc.get_delta_time()
 
-    if counter < 1:
-        # Drive forward at full speed for one second
-        rc.drive.set_speed_angle(1, 0)
-    elif counter < 2:
-        # Turn right at full speed for the next second
-        rc.drive.set_speed_angle(1, 1)
-    else:
-        # Otherwise, stop the car
-        rc.drive.stop()
-        isDriving = False
+        if counter < 1:
+            # Drive forward at full speed for one second
+            rc.drive.set_speed_angle(1, 0)
+        elif counter < 2:
+            # Turn right at full speed for the next second
+            rc.drive.set_speed_angle(1, 1)
+        else:
+            # Otherwise, stop the car
+            rc.drive.stop()
+            isDriving = False
 
 # [FUNCTION] update_slow() is similar to update() but is called once per second by
 # default. It is especially useful for printing debug messages, since printing a 
