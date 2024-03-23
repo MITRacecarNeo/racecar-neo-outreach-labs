@@ -94,10 +94,10 @@ def update():
     (x, y) = rc.controller.get_joystick(rc.controller.Joystick._____)
     if x > 0.5:
         angle = _____
-    elif x < 0.5:
+    elif x < -0.5:
         angle = -_____
     else:
-        speed = 0
+        angle = 0
 
     # TODO Part 3: Write a conditional statement such that when the
     # "A" button is pressed, increase the speed of the RACECAR. When the "B" button is pressed,
