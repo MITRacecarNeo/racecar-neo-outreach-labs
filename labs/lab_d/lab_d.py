@@ -42,6 +42,7 @@ rc = racecar_core.create_racecar()
 # Each entry is a list containing (time remaining, speed, angle)
 queue = []
 
+
 ########################################################################################
 # Functions
 ########################################################################################
@@ -55,19 +56,16 @@ def start():
     queue.clear()
 
     # Print start message
-    # TODO Part 1: Add a line explaining what the Y button does
     print(
-        ">> Lab 1 - Driving in Shapes\n"
+        ">> Lab D - Driving in Mazes\n"
         "\n"
         "Controls:\n"
-        "   Right trigger = accelerate forward\n"
-        "   Left trigger = accelerate backward\n"
-        "   Left joystick = turn front wheels\n"
-        "   A button = drive in a circle\n"
-        "   B button = drive in a square\n"
-        "   X button = drive in a figure eight\n"
-        "   Y button = drive in a <shape of your choice>\n"
+        "   A button = drive through obstacle: \"Zigzag\"\n"
+        "   B button = drive through obstacle: \"Spiral\"\n"
+        "   X button = drive through obstacle: \"Hallway\"\n"
+        "   Y button = drive through obstacle: \"Maze\"\n"
     )
+
 
 # [FUNCTION] After start() is run, this function is run once every frame (ideally at
 # 60 frames per second or slower depending on processing speed) until the back button
@@ -75,86 +73,84 @@ def start():
 def update():
     global queue
 
-    # When the A button is pressed, add instructions to drive in a circle
+    # When the A button is pressed, add instructions to drive through the obstacle "Zigzag"
     if rc.controller.was_pressed(rc.controller.Button.A):
-        drive_circle()
+        drive_zigzag()
 
-    # When the B button is pressed, add instructions to drive in a square
+    # When the B button is pressed, add instructions to drive through the obstacle "Spiral"
     if rc.controller.was_pressed(rc.controller.Button.B):
-        drive_square()
+        drive_spiral()
 
-    # When the X button is pressed, add instructions to drive in a figure eight
+    # When the X button is pressed, add instructions to drive through the obstacle "Hallway"
     if rc.controller.was_pressed(rc.controller.Button.X):
-        drive_figure_eight()
+        drive_hallway()
 
-    # When the Y button is pressed, add instructions to drive in our chosen shape
+    # When the Y button is pressed, add instructions to drive through the obstacle "Maze"
     if rc.controller.was_pressed(rc.controller.Button.Y):
-        drive_chosen_shape()
+        drive_maze()
 
-    # TODO Analyze the following code segment that executes instructions from the queue.
-    # Determine how the script processes the instructions and then sends the correct speed
-    # and angle commands to the RACECAR.
+    # TODO Part 1: Analyze the following code segment that executes instructions from the queue.
+    # Fill in the blanks with the missing variable assignments and indicies according to the
+    # behavior described by the comment below.
 
     # If the queue is not empty, follow the current drive instruction
     if len(queue) > 0:
-        speed = queue[0][1]
-        angle = queue[0][2]
-        queue[0][0] -= rc.get_delta_time()
-        if queue[0][0] <= 0:
+        speed = _____
+        angle = _____
+        queue[_][_] -= rc.get_delta_time()
+        if queue[_][_] <= 0:
             queue.pop(0)
 
     # Send speed and angle commands to the RACECAR
     rc.drive.set_speed_angle(speed, angle)
 
-# [FUNCTION] When the function is called, clear the queue, then place instructions 
-# inside of the queue that cause the RACECAR to drive in a circle
-def drive_circle():
+
+# [FUNCTION] When the function is called, clear the queue, then place instructions
+# inside of the queue that cause the RACECAR to drive in the zigzag
+def drive_zigzag():
     global queue
 
-    # Tune these constants until the car completes a full circle
-    CIRCLE_TIME = ___
-    BRAKE_TIME = ___
+    # Use this section to define and tune static variables
 
     queue.clear()
 
     # TODO Part 2: Append the correct variables in the correct order in order
-    # for the RACECAR to drive in a perfect circle
-    queue.append([_____, 1, 1])
-    queue.append([_____, -1, 1])
+    # for the RACECAR to drive in the "Zigzag" obstacle course
+    # [Hint] queue.append([time, speed, angle])
 
-# [FUNCTION] When the function is called, clear the queue, then place instructions 
-# inside of the queue that cause the RACECAR to drive in a square
-def drive_square():
+
+# [FUNCTION] When the function is called, clear the queue, then place instructions
+# inside of the queue that cause the RACECAR to drive in the spiral
+def drive_spiral():
     global queue
 
-    # TODO Part 3: Create constants that represent the RACECAR driving through
-    # different parts of the square (ex: first slower edge, corners, fast edges)
-    
+    # Use this section to define and tune static variables
+
     queue.clear()
 
-    # TODO Part 4: Append the instructions into the queue that represent the RACECAR
-    # driving in a perfect square.
-    
+    # TODO Part 3: Append the instructions into the queue that represent the RACECAR
+    # driving in the "Spiral" obstacle course
+
 
 # [FUNCTION] When the function is called, clear the queue, then place instructions 
-# inside of the queue that cause the RACECAR to drive in a figure 8
-def drive_figure_eight():
+# inside of the queue that cause the RACECAR to drive through the hallway
+def drive_hallway():
     global queue
 
-    # TODO Part 5: Create constants that represent the RACECAR driving through
-    # different parts of the figure 8, and then append the instructions in the
+    # TODO Part 4: Create constants that represent the RACECAR driving through
+    # the "Hallway" obstacle course, and then append the instructions in the
     # correct order into the queue for execution
 
     queue.clear()
 
 
 # [FUNCTION] When the function is called, clear the queue, then place instructions 
-# inside of the queue that cause the RACECAR to drive in the shape of your choice
-def drive_chosen_shape():
+# inside of the queue that cause the RACECAR to drive in the maze
+def drive_maze():
     global queue
 
-    # TODO Part 6: Create constants that represent the RACECAR driving through
-    # different parts of the shape, and then append the instructions in the
+    # TODO Part 5: Create constants that represent the RACECAR driving through
+    # different parts of the maze, and then append the instructions in the
     # correct order into the queue for execution
 
     queue.clear()
