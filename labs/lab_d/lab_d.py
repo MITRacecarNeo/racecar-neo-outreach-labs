@@ -15,10 +15,10 @@ Complete the lines of code under the #TODO indicators to complete the lab.
 
 Expected Outcome: When the user runs the script, they are able to control the RACECAR
 using the following keys:
-- When the "A" button is pressed, drive in a circle
-- When the "B" button is pressed, drive in a square
-- When the "X" button is pressed, drive in a figure eight
-- When the "Y" button is pressed, drive in any shape of your choice
+- When the "A" button is pressed, drive through the obstacle "Zigzag"
+- When the "B" button is pressed, drive through the obstacle "Spiral"
+- When the "X" button is pressed, drive through the obstacle "Hallway"
+- When the "Y" button is pressed, drive through the obstacle "Maze"
 """
 
 ########################################################################################
