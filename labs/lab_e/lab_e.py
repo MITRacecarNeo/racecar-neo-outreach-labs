@@ -41,15 +41,10 @@ select and then right clicking on the light to scroll through available colors.
 # Imports
 ########################################################################################
 
-import sys
 import cv2 as cv
 import numpy as np
 
-# If this file is nested inside a folder in the labs folder, the relative path should
-# be [1, ../../library] instead.
-sys.path.insert(1, "../../library")
 import racecar_core
-import racecar_utils as rc_utils
 
 ########################################################################################
 # Global variables

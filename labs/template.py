@@ -19,12 +19,8 @@ the script.]
 # Imports
 ########################################################################################
 
-import sys
-
-# If this file is nested inside a folder in the labs folder, the relative path should
-# be [1, ../../library] instead.
-sys.path.insert(0, '../library')
 import racecar_core
+# import racecar_utils as rc_utils  # uncomment when you need helpers from racecar_utils
 
 ########################################################################################
 # Global variables

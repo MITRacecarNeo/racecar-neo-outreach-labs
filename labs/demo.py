@@ -20,9 +20,6 @@ Expected Outcome: Terminal output and RACECAR movement occurs when buttons are p
 # Imports
 ########################################################################################
 
-import sys
-
-sys.path.insert(0, '../library')
 import racecar_core
 
 ########################################################################################

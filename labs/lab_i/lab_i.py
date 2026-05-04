@@ -37,11 +37,6 @@ running through the race in "race mode" to do the full course. Lowest time wins!
 # Imports
 ########################################################################################
 
-import sys
-
-# If this file is nested inside a folder in the labs folder, the relative path should
-# be [1, ../../library] instead.
-sys.path.insert(0, '../library')
 import racecar_core
 
 ########################################################################################

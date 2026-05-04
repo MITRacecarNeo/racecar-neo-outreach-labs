@@ -14,9 +14,6 @@ Purpose: A simple program which can be used to manually test racecar_core functi
 # Imports
 ########################################################################################
 
-import sys
-
-sys.path.insert(1, "../library")
 import racecar_core
 import racecar_utils as rc_utils
 
