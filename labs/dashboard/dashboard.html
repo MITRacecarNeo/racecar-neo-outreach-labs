@@ -21,10 +21,16 @@
   .topbar button { background: transparent; border: 1px solid var(--red); color: var(--red); font-weight: bold; font-family: inherit;
                    padding: 0.4rem 1rem; border-radius: 6px; cursor: pointer; }
   .topbar button:hover { background: var(--red); color: var(--white); }
-  main { padding: 1rem 1.5rem; }
-  .grid { display: grid; grid-template-columns: 400px 452px 1fr; gap: 1rem; align-items: start; }
-  @media (max-width: 1400px) { .grid { grid-template-columns: 1fr; } }
-  .card { background: var(--white); border: 1px solid var(--steel); border-radius: 12px; padding: 1rem; margin-bottom: 1rem;
+  /* Rows share one gap; cards in a row stretch to the tallest so edges line up */
+  main { padding: 1rem 1.5rem; display: grid; gap: 1rem; }
+  .grid { display: grid; grid-template-columns: 400px 452px 1fr; gap: 1rem; align-items: stretch; }
+  .column { display: grid; grid-template-rows: auto 1fr; gap: 1rem; }
+  .span2 { grid-column: span 2; }
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .centered { display: flex; flex-direction: column; }
+  .centered canvas { margin: auto 0; }
+  @media (max-width: 1400px) { .grid { grid-template-columns: 1fr; } .span2 { grid-column: auto; } }
+  .card { background: var(--white); border: 1px solid var(--steel); border-radius: 12px; padding: 1rem; margin: 0;
           box-shadow: 0 6px 18px rgba(35, 31, 32, 0.07); }
   .card h2 { font-size: 1rem; color: var(--tarmac); margin-bottom: 0.5rem; padding-bottom: 0.35rem; border-bottom: 2px solid var(--accent-dark); }
   .view { background: var(--tarmac); border-radius: 6px; width: 100%; max-width: 368px; display: block; aspect-ratio: 4 / 3; object-fit: contain; }
@@ -37,7 +43,7 @@
   .state { font-size: 1.3rem; color: var(--white); background: var(--tarmac); border-radius: 8px; padding: 0.9rem 0.6rem; margin-bottom: 0.7rem; text-align: center; }
   .state.moving { background: var(--accent); }
   .state.timeout, .state.offline { background: var(--red); }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: stretch; }
   @media (max-width: 900px) { .row2 { grid-template-columns: 1fr; } }
   .pad { display: grid; grid-template-columns: repeat(3, 84px); grid-template-rows: repeat(3, 84px); gap: 8px; justify-content: center; margin: 0.8rem auto;
          touch-action: none; user-select: none; }
@@ -67,12 +73,12 @@
     <figure><img id="color" class="view" alt="color camera view"><figcaption>Color</figcaption></figure>
     <figure><img id="depth" class="view" alt="depth camera view"><figcaption>Depth: bright near, dark far, black no return</figcaption></figure>
   </div>
-  <div class="card">
+  <div class="card centered">
     <h2>Lidar</h2>
     <canvas id="lidar" width="420" height="420" title="Scan points around the car; the nose is up. Scroll to zoom."></canvas>
     <div class="legend">range <span id="lidarRange">4</span> m</div>
   </div>
-  <div>
+  <div class="column">
     <div class="card">
       <h2>Encoder</h2>
       <div class="state offline" id="state">Waiting for user program mode</div>
@@ -88,9 +94,32 @@
       <div class="readout" id="imu"></div>
     </div>
   </div>
-</div>
-<div class="row2">
+  <div class="card span2">
+    <h2>Battery</h2>
+    <div class="state" id="battery">? V &bull; ? A</div>
+    <div class="pair">
+      <div>
+        <canvas id="voltChart" class="chart" width="600" height="150"></canvas>
+        <div class="legend"><span style="color:var(--x)">voltage V</span></div>
+      </div>
+      <div>
+        <canvas id="ampChart" class="chart" width="600" height="150"></canvas>
+        <div class="legend"><span style="color:var(--y)">current A</span></div>
+      </div>
+    </div>
+  </div>
   <div class="card">
+    <h2>Compass</h2>
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;align-items:center">
+      <canvas id="compass" width="200" height="200" title="The car points up; the orange marker is magnetic north. Heading: 0 deg facing north, increasing counterclockwise."></canvas>
+      <div>
+        <canvas id="magChart" class="chart" width="600" height="150"></canvas>
+        <div class="legend">Magnetic field uT: <span style="color:var(--x)">x</span><span style="color:var(--y)">y</span><span style="color:var(--z)">z</span></div>
+        <div class="readout" id="mag"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card span2">
     <h2>Drive</h2>
     <div class="pad" id="pad">
       <div></div><button data-axis="fwd" data-val="1">&#9650;</button><div></div>
@@ -103,27 +132,6 @@
     <label>Speed command: <b id="speedVal"></b><input type="range" id="speed" min="0" max="1" step="0.05"></label>
     <label>Steering command: <b id="angleVal"></b><input type="range" id="angle" min="0" max="1" step="0.05"></label>
     <label>Max speed (rc.drive.set_max_speed): <b id="maxVal"></b><input type="range" id="max_speed" min="0" max="1" step="0.05"></label>
-  </div>
-</div>
-<div class="row2">
-  <div class="card">
-    <h2>Battery</h2>
-    <div class="state" id="battery">? V &bull; ? A</div>
-    <canvas id="voltChart" class="chart" width="600" height="150"></canvas>
-    <div class="legend"><span style="color:var(--x)">voltage V</span></div>
-    <canvas id="ampChart" class="chart" width="600" height="150" style="margin-top:0.6rem"></canvas>
-    <div class="legend"><span style="color:var(--y)">current A</span></div>
-  </div>
-  <div class="card">
-    <h2>Compass</h2>
-    <div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;align-items:center">
-      <canvas id="compass" width="200" height="200" title="The car points up; the orange marker is magnetic north. Heading: 0 deg facing north, increasing counterclockwise."></canvas>
-      <div>
-        <canvas id="magChart" class="chart" width="600" height="150"></canvas>
-        <div class="legend">Magnetic field uT: <span style="color:var(--x)">x</span><span style="color:var(--y)">y</span><span style="color:var(--z)">z</span></div>
-        <div class="readout" id="mag"></div>
-      </div>
-    </div>
   </div>
 </div>
 </main>
@@ -177,17 +185,17 @@ function drawLidar(scan) {
 }
 
 // Line chart of hist columns over the last 10 s, autoscaled with a zero line
-function drawChart(id, hist, cols, colors) {
+function drawChart(id, hist, cols, colors, includeZero = true) {
   const cv = document.getElementById(id), c = cv.getContext('2d'), w = cv.width, h = cv.height;
   c.clearRect(0, 0, w, h);
   if (hist.length < 2) return;
   const t1 = hist[hist.length - 1][0], t0 = t1 - 10;
   let lo = Infinity, hi = -Infinity;
   for (const row of hist) for (const i of cols) { lo = Math.min(lo, row[i]); hi = Math.max(hi, row[i]); }
-  lo = Math.min(lo, 0); hi = Math.max(hi, 0);
+  if (includeZero) { lo = Math.min(lo, 0); hi = Math.max(hi, 0); }
   const pad = Math.max((hi - lo) * 0.1, 0.05); lo -= pad; hi += pad;
   const x = t => (t - t0) / 10 * w, y = v => h - (v - lo) / (hi - lo) * h;
-  c.strokeStyle = 'rgba(245,245,247,0.25)'; c.beginPath(); c.moveTo(0, y(0)); c.lineTo(w, y(0)); c.stroke();
+  if (lo < 0 && hi > 0) { c.strokeStyle = 'rgba(245,245,247,0.25)'; c.beginPath(); c.moveTo(0, y(0)); c.lineTo(w, y(0)); c.stroke(); }
   c.fillStyle = 'rgba(245,245,247,0.6)'; c.font = '11px sans-serif';
   c.fillText(hi.toFixed(2), 4, 12); c.fillText(lo.toFixed(2), 4, h - 4);
   cols.forEach((i, n) => {
@@ -243,7 +251,7 @@ async function poll() {
     drawChart('accChart', s.hist, [3, 4, 5], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     drawChart('gyroChart', s.hist, [6, 7, 8], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     document.getElementById('battery').textContent = `${s.volts.toFixed(2)} V • ${s.amps.toFixed(2)} A`;
-    drawChart('voltChart', s.hist, [9], ['#EC8B48']);
+    drawChart('voltChart', s.hist, [9], ['#EC8B48'], false);
     drawChart('ampChart', s.hist, [10], ['#7FC8A9']);
     drawChart('magChart', s.hist, [11, 12, 13], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     drawCompass(s.heading);
