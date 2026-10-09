@@ -36,7 +36,7 @@ import time
 from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any, Deque, Dict, List
+from typing import Any, Deque, Dict, List, Tuple
 
 import cv2
 import numpy as np
@@ -67,6 +67,8 @@ _depth_jpeg = b""
 _cmd: Dict[str, Any] = {"fwd": 0, "turn": 0, "stamp": 0.0, "speed": 0.5, "angle": 1.0, "max_speed": 0.25,
                         "max_speed_changed": True}
 _hist: Deque[List[float]] = deque()
+# Matrix and LED commands from the browser, applied by update()
+_actions: Deque[Tuple[str, Any]] = deque(maxlen=20)
 _T0 = time.monotonic()
 _last_camera = 0.0
 _frame_times: Deque[float] = deque(maxlen=60)
@@ -131,6 +133,18 @@ def _apply_drive() -> Dict[str, float]:
             "timed_out": float(timed_out), "target": speed * cmd["max_speed"] * 4.0}
 
 
+def _apply_actions() -> None:
+    while True:
+        with _lock:
+            if not _actions:
+                return
+            kind, value = _actions.popleft()
+        if kind == "matrix":
+            rc.display.set_matrix(np.array(value, dtype=np.uint8).reshape((8, 24)))
+        elif kind == "text":
+            rc.display.show_text(value)
+
+
 def start() -> None:
     with _lock:
         _cmd["max_speed_changed"] = True
@@ -142,6 +156,7 @@ def update() -> None:
     now = _now()
     _frame_times.append(time.monotonic())
     drive = _apply_drive()
+    _apply_actions()
     _read_camera()
 
     accel = rc.physics.get_linear_acceleration()
@@ -176,6 +191,7 @@ def update() -> None:
             "volts": round(volts, 3), "amps": round(amps, 3),
             "mag": [round(v, 2) for v in mag_ut], "heading": round(heading, 1),
             "scan": scan,
+            "matrix": [int(v != 0) for v in np.asarray(rc.display.get_matrix()).flatten()],
             "hist": list(_hist),
         })
 
@@ -212,6 +228,11 @@ class Handler(BaseHTTPRequestHandler):
                     if key in data:
                         _cmd[key] = max(low, min(high, float(data[key])))
                 _cmd["max_speed_changed"] = "max_speed" in data or _cmd["max_speed_changed"]
+            elif self.path == "/matrix":
+                pixels = [1 if v else 0 for v in data.get("pixels", [])][:192]
+                _actions.append(("matrix", pixels + [0] * (192 - len(pixels))))
+            elif self.path == "/text":
+                _actions.append(("text", str(data.get("text", ""))[:255]))
             elif self.path == "/stop":
                 _cmd["fwd"] = _cmd["turn"] = 0
             else:

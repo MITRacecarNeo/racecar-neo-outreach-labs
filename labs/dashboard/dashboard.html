@@ -26,10 +26,20 @@
   .grid { display: grid; grid-template-columns: 400px 452px 1fr; gap: 1rem; align-items: stretch; }
   .column { display: grid; grid-template-rows: auto 1fr; gap: 1rem; }
   .span2 { grid-column: span 2; }
+  .span3 { grid-column: span 3; }
+  .matrixrow { display: grid; grid-template-columns: auto 1fr; gap: 2rem; align-items: start; }
+  .matrix { display: grid; grid-template-columns: repeat(24, 26px); grid-auto-rows: 26px; gap: 3px; background: #0E0C0C;
+            padding: 8px; border-radius: 6px; width: max-content; user-select: none; }
+  .matrix span { border-radius: 50%; background: #3A100E; cursor: pointer; }
+  .matrix span.on { background: #FF3020; box-shadow: 0 0 6px #FF3020; }
+  .matrix.small { grid-template-columns: repeat(24, 10px); grid-auto-rows: 10px; gap: 2px; padding: 5px; }
+  .matrix.small span { cursor: default; }
+  input[type=text] { display: block; width: 100%; max-width: 420px; padding: 0.35rem; margin-top: 0.3rem; font: inherit;
+                     border: 1px solid rgba(35, 31, 32, 0.28); border-radius: 6px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   .centered { display: flex; flex-direction: column; }
   .centered canvas { margin: auto 0; }
-  @media (max-width: 1400px) { .grid { grid-template-columns: 1fr; } .span2 { grid-column: auto; } }
+  @media (max-width: 1400px) { .grid { grid-template-columns: 1fr; } .span2, .span3 { grid-column: auto; } .matrixrow { grid-template-columns: 1fr; } }
   .card { background: var(--white); border: 1px solid var(--steel); border-radius: 12px; padding: 1rem; margin: 0;
           box-shadow: 0 6px 18px rgba(35, 31, 32, 0.07); }
   .card h2 { font-size: 1rem; color: var(--tarmac); margin-bottom: 0.5rem; padding-bottom: 0.35rem; border-bottom: 2px solid var(--accent-dark); }
@@ -54,6 +64,9 @@
   label { display: block; color: rgba(35, 31, 32, 0.6); font-size: 0.8rem; margin-top: 0.6rem; }
   label b { color: var(--carbon); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
+  .card > button, .matrixrow button { background: var(--white); border: 1px solid rgba(35, 31, 32, 0.28); color: var(--tarmac); font: inherit;
+           padding: 0.35rem 0.8rem; border-radius: 6px; margin: 0.8rem 0.4rem 0 0; cursor: pointer; }
+  .matrixrow button:hover { background: var(--halo); border-color: var(--accent); color: var(--accent); }
 </style>
 </head>
 <body>
@@ -116,6 +129,24 @@
         <canvas id="magChart" class="chart" width="600" height="150"></canvas>
         <div class="legend">Magnetic field uT: <span style="color:var(--x)">x</span><span style="color:var(--y)">y</span><span style="color:var(--z)">z</span></div>
         <div class="readout" id="mag"></div>
+      </div>
+    </div>
+  </div>
+  <div class="card span3">
+    <h2>Dot matrix</h2>
+    <div class="matrixrow">
+      <div>
+        <div class="matrix" id="matrixEdit" title="Click or drag to toggle dots, then Send."></div>
+        <button onclick="sendMatrix()">Send (set_matrix)</button>
+        <button onclick="editMatrix(() => 0)">Clear</button>
+        <button onclick="editMatrix(v => 1 - v)">Invert</button>
+        <button onclick="editMatrix((v, i) => (Math.floor(i / 24) + i % 24) % 2)">Checkerboard</button>
+      </div>
+      <div>
+        <label>Text (show_text)<input type="text" id="matrixText" maxlength="255" value="Hello, RACECAR!"></label>
+        <button onclick="post('/text', { text: document.getElementById('matrixText').value })">Show text</button>
+        <div class="legend" style="margin-top:0.8rem">get_matrix(): the last frame sent with set_matrix</div>
+        <div class="matrix small" id="matrixState"></div>
       </div>
     </div>
   </div>
@@ -225,6 +256,31 @@ function drawCompass(heading) {
   c.fillText(heading.toFixed(1) + '°', w / 2, w - 4);
 }
 
+// Dot matrix editor: 192 cells, row-major; click or drag to toggle
+const matrixCells = new Array(192).fill(0);
+let dragValue = null;
+function buildMatrix(id, editable) {
+  const el = document.getElementById(id);
+  for (let i = 0; i < 192; i++) {
+    const dot = document.createElement('span');
+    if (editable) {
+      dot.addEventListener('pointerdown', e => { e.preventDefault(); dragValue = 1 - matrixCells[i]; setCell(i, dragValue); });
+      dot.addEventListener('pointerenter', () => { if (dragValue !== null) setCell(i, dragValue); });
+    }
+    el.appendChild(dot);
+  }
+}
+addEventListener('pointerup', () => { dragValue = null; });
+function setCell(i, v) { matrixCells[i] = v; document.getElementById('matrixEdit').children[i].classList.toggle('on', !!v); }
+function editMatrix(f) { for (let i = 0; i < 192; i++) setCell(i, f(matrixCells[i], i)); }
+function sendMatrix() { post('/matrix', { pixels: matrixCells }); }
+function showMatrixState(pixels) {
+  const dots = document.getElementById('matrixState').children;
+  for (let i = 0; i < 192 && i < pixels.length; i++) dots[i].classList.toggle('on', !!pixels[i]);
+}
+buildMatrix('matrixEdit', true);
+buildMatrix('matrixState', false);
+
 const fmt = v => v.map(n => (n >= 0 ? ' ' : '') + n.toFixed(3)).join('  ');
 
 async function poll() {
@@ -255,6 +311,7 @@ async function poll() {
     drawChart('ampChart', s.hist, [10], ['#7FC8A9']);
     drawChart('magChart', s.hist, [11, 12, 13], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     drawCompass(s.heading);
+    showMatrixState(s.matrix);
     const norm = Math.hypot(s.mag[0], s.mag[1], s.mag[2]);
     document.getElementById('mag').textContent = `field ${s.mag.map(v => v.toFixed(2)).join('  ')} uT  |B| ${norm.toFixed(2)}\nheading ${s.heading.toFixed(1)} deg`;
     document.getElementById('imu').textContent = `accel ${fmt(s.accel)}\ngyro  ${fmt(s.gyro)}`;

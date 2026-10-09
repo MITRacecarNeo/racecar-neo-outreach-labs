@@ -26,6 +26,9 @@ Interactive controls, in user program mode:
     LB       imu      gravity at rest, magnetometer strength, and compass
                       heading against the gyro through a full left circle
                       (about 1 m of room around the car)
+    RB       matrix   checkerboard, border, a counter, scrolling text, then
+                      the text held without resending; watch the matrix
+                      (RacecarSim: Settings, Show dot matrix)
     Y        print the menu again
     Triggers and left joystick drive the car between sections.
 
@@ -283,11 +286,65 @@ class ImuSection(Section):
         return True
 
 
+class MatrixSection(Section):
+    """Shows patterns, a counter, and scrolling text, then holds the text without resending."""
+
+    title = "matrix: dot matrix frames and text"
+    # (start time, what to show, what the matrix should look like)
+    STEPS = [
+        (0.0, "checkerboard", "alternating dots"),
+        (3.0, "border", "a rectangle around the edge"),
+        (6.0, "counter", "0 s to 5 s, one per second, not scrolling"),
+        (12.0, "scroll", "a long message scrolling right to left, once every 4 s"),
+        (20.0, "hold", "the same message still scrolling: nothing is resent"),
+    ]
+    END = 30.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.index = -1
+        self.count = -1
+
+    def step(self) -> bool:
+        t = self.elapsed()
+        r = self.report
+        while self.index + 1 < len(self.STEPS) and t >= self.STEPS[self.index + 1][0]:
+            self.index += 1
+            name, expect = self.STEPS[self.index][1:]
+            print(f"  [{t:5.1f} s] {name}: expect {expect}")
+            if name == "checkerboard":
+                matrix = rc.display.new_matrix()
+                matrix[::2, ::2] = 1
+                matrix[1::2, 1::2] = 1
+                rc.display.set_matrix(matrix)
+                r.check("checkerboard round trip", np.array_equal(rc.display.get_matrix(), matrix))
+            elif name == "border":
+                matrix = rc.display.new_matrix()
+                matrix[0, :] = matrix[-1, :] = 1
+                matrix[:, 0] = matrix[:, -1] = 1
+                rc.display.set_matrix(matrix * 255)
+                r.check("0/255 values accepted", int(rc.display.get_matrix().max()) == 255)
+            elif name == "scroll":
+                rc.display.show_text("Hello from the sensor checks!")
+        if self.index >= 0 and self.STEPS[self.index][1] == "counter":
+            count = min(int(t - 6.0), 5)
+            if count != self.count:
+                self.count = count
+                rc.display.show_text(f"{count} s")
+        if t < self.END:
+            return False
+        rc.display.set_matrix_intensity(0.5)
+        r.check("set_matrix_intensity accepted", True, "no-op with one warning, as on the car")
+        r.check("frames and text sent", True, "confirm what the matrix showed against the expectations above")
+        return True
+
+
 SECTIONS: Dict[str, Tuple[Optional[Any], Callable[[], Section]]] = {
     "api": (rc.controller.Button.A, ApiSection),
     "encoder": (rc.controller.Button.B, EncoderSection),
     "power": (rc.controller.Button.X, PowerSection),
     "imu": (rc.controller.Button.LB, ImuSection),
+    "matrix": (rc.controller.Button.RB, MatrixSection),
 }
 
 active: Optional[Section] = None
