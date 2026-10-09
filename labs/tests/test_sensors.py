@@ -21,6 +21,11 @@ Interactive controls, in user program mode:
     B        encoder  drive at speed 0.25, 0.5, 1.0 (max speed 1.0) and compare;
                       needs about 25 m of straight road (RacecarSim: Long
                       Hallway Sandbox)
+    X        power    battery voltage and current at idle and while driving
+                      (about 3 m of room ahead)
+    LB       imu      gravity at rest, magnetometer strength, and compass
+                      heading against the gyro through a full left circle
+                      (about 1 m of room around the car)
     Y        print the menu again
     Triggers and left joystick drive the car between sections.
 
@@ -28,6 +33,7 @@ Expected Outcome: every check in the chosen section prints PASS.
 """
 
 import argparse
+import math
 import os
 import signal
 import sys
@@ -172,9 +178,116 @@ class EncoderSection(Section):
         return True
 
 
+class PowerSection(Section):
+    """Compares battery voltage and current at idle and while driving with the sim's model."""
+
+    title = "power: battery voltage and current"
+    IDLE_S = 2.0
+    DRIVE_S = 2.5
+    SPEED = 0.25  # 1.0 m/s at max speed 1.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.idle: List[Tuple[float, float]] = []
+        self.drive: List[Tuple[float, float, float]] = []
+        rc.drive.set_max_speed(1.0)
+
+    def step(self) -> bool:
+        t = self.elapsed()
+        volts = rc.physics.get_battery_voltage()
+        amps = rc.physics.get_battery_current()
+        if t < self.IDLE_S:
+            rc.drive.set_speed_angle(0, 0)
+            if t > 0.5:
+                self.idle.append((volts, amps))
+            return False
+        if t < self.IDLE_S + self.DRIVE_S:
+            rc.drive.set_speed_angle(self.SPEED, args.angle)
+            if t > self.IDLE_S + 1.0:
+                self.drive.append((volts, amps, rc.physics.get_encoder_speed()))
+            return False
+        rc.drive.set_speed_angle(0, 0)
+
+        r = self.report
+        idle_v = float(np.mean([v for v, _ in self.idle]))
+        idle_a = float(np.mean([a for _, a in self.idle]))
+        drive_v = float(np.mean([v for v, _, _ in self.drive]))
+        drive_a = float(np.mean([a for _, a, _ in self.drive]))
+        speed = float(np.mean([abs(e) for _, _, e in self.drive]))
+        expected_a = 5.0 + 5.0 * min(speed / 4.0, 1.0)
+        r.check("voltage in 7.0 to 8.4 V", all(6.99 <= v <= 8.41 for v, _ in self.idle + [d[:2] for d in self.drive]),
+                f"idle {idle_v:.3f} V, driving {drive_v:.3f} V")
+        r.check("current never negative", all(a >= 0 for _, a in self.idle + [d[:2] for d in self.drive]))
+        r.check("idle current about 2.5 A", abs(idle_a - 2.5) < 0.1, f"{idle_a:.3f} A")
+        r.check("driving current 5 A + 5 A x speed / 4 m/s", abs(drive_a - expected_a) < 0.3,
+                f"{drive_a:.3f} A at {speed:.2f} m/s (model {expected_a:.2f} A)")
+        sag = idle_v - drive_v
+        r.check("voltage sags 0.02 ohm x extra current", abs(sag - 0.02 * (drive_a - idle_a)) < 0.03,
+                f"{sag * 1000:.0f} mV for {drive_a - idle_a:.2f} A")
+        return True
+
+
+class ImuSection(Section):
+    """Gravity and field strength at rest, then the compass heading against the gyro in a left circle."""
+
+    title = "imu: REP-103 axes, magnetometer, compass"
+    REST_S = 2.0
+    TURN_S = 6.0
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.rest_accel: List[Any] = []
+        self.rest_mag: List[Any] = []
+        self.gyro_heading = 0.0
+        self.mag_heading: List[float] = []
+        self.yaw_rates: List[float] = []
+        rc.drive.set_max_speed(1.0)
+
+    def step(self) -> bool:
+        t = self.elapsed()
+        mag = rc.physics.get_magnetic_field()
+        if t < self.REST_S:
+            rc.drive.set_speed_angle(0, 0)
+            if t > 0.5:
+                self.rest_accel.append(rc.physics.get_linear_acceleration())
+                self.rest_mag.append(mag)
+            return False
+        if t < self.REST_S + self.TURN_S:
+            # Full left lock at 1 m/s: one circle about every 3 s
+            rc.drive.set_speed_angle(0.25, -1.0)
+            if t > self.REST_S + 1.0:
+                yaw_rate = rc.physics.get_angular_velocity()[2]
+                self.yaw_rates.append(yaw_rate)
+                self.gyro_heading += math.degrees(yaw_rate) * rc.get_delta_time()
+                self.mag_heading.append(math.degrees(math.atan2(-mag[1], mag[0])))
+            return False
+        rc.drive.set_speed_angle(0, 0)
+
+        r = self.report
+        accel = np.mean(self.rest_accel, axis=0)
+        r.check("at rest, gravity on +z", abs(accel[2] - 9.81) < 0.3 and abs(accel[0]) < 0.3 and abs(accel[1]) < 0.3,
+                np.array2string(accel, precision=3))
+        field_ut = np.mean(self.rest_mag, axis=0) * 1e6
+        strength = float(np.linalg.norm(field_ut))
+        r.check("field strength 51 uT, pointing down", abs(strength - 51.1) < 3.0 and field_ut[2] < -40,
+                f"{np.array2string(field_ut, precision=2)} uT, |B| {strength:.2f}")
+        r.check("left turn is positive yaw (z)", float(np.mean(self.yaw_rates)) > 0.5,
+                f"{np.mean(self.yaw_rates):.3f} rad/s")
+        unwrapped = np.degrees(np.unwrap(np.radians(self.mag_heading)))
+        compass_turn = float(unwrapped[-1] - unwrapped[0])
+        gyro_turn = self.gyro_heading
+        r.check("compass heading increases turning left", compass_turn > 300,
+                f"compass {compass_turn:.1f} deg")
+        r.check("compass matches integrated gyro within 5 percent", abs(compass_turn - gyro_turn) < 0.05 * abs(gyro_turn),
+                f"compass {compass_turn:.1f} deg, gyro {gyro_turn:.1f} deg")
+        return True
+
+
 SECTIONS: Dict[str, Tuple[Optional[Any], Callable[[], Section]]] = {
     "api": (rc.controller.Button.A, ApiSection),
     "encoder": (rc.controller.Button.B, EncoderSection),
+    "power": (rc.controller.Button.X, PowerSection),
+    "imu": (rc.controller.Button.LB, ImuSection),
 }
 
 active: Optional[Section] = None

@@ -105,6 +105,27 @@
     <label>Max speed (rc.drive.set_max_speed): <b id="maxVal"></b><input type="range" id="max_speed" min="0" max="1" step="0.05"></label>
   </div>
 </div>
+<div class="row2">
+  <div class="card">
+    <h2>Battery</h2>
+    <div class="state" id="battery">? V &bull; ? A</div>
+    <canvas id="voltChart" class="chart" width="600" height="150"></canvas>
+    <div class="legend"><span style="color:var(--x)">voltage V</span></div>
+    <canvas id="ampChart" class="chart" width="600" height="150" style="margin-top:0.6rem"></canvas>
+    <div class="legend"><span style="color:var(--y)">current A</span></div>
+  </div>
+  <div class="card">
+    <h2>Compass</h2>
+    <div style="display:grid;grid-template-columns:200px 1fr;gap:1rem;align-items:center">
+      <canvas id="compass" width="200" height="200" title="The car points up; the orange marker is magnetic north. Heading: 0 deg facing north, increasing counterclockwise."></canvas>
+      <div>
+        <canvas id="magChart" class="chart" width="600" height="150"></canvas>
+        <div class="legend">Magnetic field uT: <span style="color:var(--x)">x</span><span style="color:var(--y)">y</span><span style="color:var(--z)">z</span></div>
+        <div class="readout" id="mag"></div>
+      </div>
+    </div>
+  </div>
+</div>
 </main>
 <script>
 const held = { fwd: 0, turn: 0 };
@@ -176,6 +197,26 @@ function drawChart(id, hist, cols, colors) {
   });
 }
 
+// The car points up. Turning left by h degrees moves north h degrees clockwise on the dial.
+function drawCompass(heading) {
+  const cv = document.getElementById('compass'), c = cv.getContext('2d'), w = cv.width, r = w / 2 - 14;
+  c.clearRect(0, 0, w, w);
+  c.save();
+  c.translate(w / 2, w / 2);
+  c.strokeStyle = 'rgba(245,245,247,0.3)';
+  c.beginPath(); c.arc(0, 0, r, 0, 2 * Math.PI); c.stroke();
+  c.fillStyle = 'rgba(245,245,247,0.5)';
+  c.beginPath(); c.moveTo(0, -18); c.lineTo(-6, 10); c.lineTo(6, 10); c.fill();
+  c.rotate(heading * Math.PI / 180);
+  c.fillStyle = '#EC8B48';
+  c.beginPath(); c.moveTo(0, -r + 6); c.lineTo(-6, -r + 22); c.lineTo(6, -r + 22); c.fill();
+  c.font = 'bold 13px sans-serif'; c.textAlign = 'center';
+  c.fillText('N', 0, -r + 36);
+  c.restore();
+  c.fillStyle = '#F5F5F7'; c.font = '13px sans-serif'; c.textAlign = 'center';
+  c.fillText(heading.toFixed(1) + '°', w / 2, w - 4);
+}
+
 const fmt = v => v.map(n => (n >= 0 ? ' ' : '') + n.toFixed(3)).join('  ');
 
 async function poll() {
@@ -201,6 +242,13 @@ async function poll() {
     drawChart('encChart', s.hist, [1, 2], ['#F5F5F7', '#EC8B48']);
     drawChart('accChart', s.hist, [3, 4, 5], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     drawChart('gyroChart', s.hist, [6, 7, 8], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
+    document.getElementById('battery').textContent = `${s.volts.toFixed(2)} V • ${s.amps.toFixed(2)} A`;
+    drawChart('voltChart', s.hist, [9], ['#EC8B48']);
+    drawChart('ampChart', s.hist, [10], ['#7FC8A9']);
+    drawChart('magChart', s.hist, [11, 12, 13], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
+    drawCompass(s.heading);
+    const norm = Math.hypot(s.mag[0], s.mag[1], s.mag[2]);
+    document.getElementById('mag').textContent = `field ${s.mag.map(v => v.toFixed(2)).join('  ')} uT  |B| ${norm.toFixed(2)}\nheading ${s.heading.toFixed(1)} deg`;
     document.getElementById('imu').textContent = `accel ${fmt(s.accel)}\ngyro  ${fmt(s.gyro)}`;
   } catch (e) {
     const st = document.getElementById('state');

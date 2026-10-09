@@ -30,6 +30,7 @@ link coasts the car to a stop.
 
 import argparse
 import json
+import math
 import threading
 import time
 from collections import deque
@@ -146,6 +147,11 @@ def update() -> None:
     accel = rc.physics.get_linear_acceleration()
     gyro = rc.physics.get_angular_velocity()
     encoder = rc.physics.get_encoder_speed()
+    volts = rc.physics.get_battery_voltage()
+    amps = rc.physics.get_battery_current()
+    mag_ut = [float(v) * 1e6 for v in rc.physics.get_magnetic_field()]
+    # 0 facing magnetic north, increasing counterclockwise
+    heading = math.degrees(math.atan2(-mag_ut[1], mag_ut[0]))
     samples = np.asarray(rc.lidar.get_samples(), dtype=np.float32)
     n = len(samples)
     # Student angle: 0 the nose, positive to the right; racecar_core lidar is in cm
@@ -153,7 +159,8 @@ def update() -> None:
             for i in range(0, n, 3) if samples[i] > 0]
 
     _hist.append([round(now, 2), round(encoder, 3), round(drive["target"], 3),
-                  *[round(float(v), 3) for v in accel], *[round(float(v), 4) for v in gyro]])
+                  *[round(float(v), 3) for v in accel], *[round(float(v), 4) for v in gyro],
+                  round(volts, 3), round(amps, 3), *[round(v, 2) for v in mag_ut]])
     while _hist and now - _hist[0][0] > HISTORY_S:
         _hist.popleft()
     fps = (len(_frame_times) - 1) / (_frame_times[-1] - _frame_times[0]) if len(_frame_times) > 1 else 0.0
@@ -166,6 +173,8 @@ def update() -> None:
             "accel": [round(float(v), 3) for v in accel],
             "gyro": [round(float(v), 4) for v in gyro],
             "encoder": round(encoder, 3),
+            "volts": round(volts, 3), "amps": round(amps, 3),
+            "mag": [round(v, 2) for v in mag_ut], "heading": round(heading, 1),
             "scan": scan,
             "hist": list(_hist),
         })
