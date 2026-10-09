@@ -16,26 +16,32 @@ Usage:
     python test_sensors.py                         interactive (physical car)
     python test_sensors.py -s --section encoder    run one section, print the report, exit
 
-Interactive controls, in user program mode:
-    A        api      every sensor read and actuator command once
-    B        encoder  drive at speed 0.25, 0.5, 1.0 (max speed 1.0) and compare;
+Interactive controls, in user program mode (controller button, RacecarSim
+keyboard key in brackets):
+    A    [1] api      every sensor read and actuator command once
+    B    [2] encoder  drive at speed 0.25, 0.5, 1.0 (max speed 1.0) and compare;
                       needs about 25 m of straight road (RacecarSim: Long
                       Hallway Sandbox)
-    X        power    battery voltage and current at idle and while driving
+    X    [3] power    battery voltage and current at idle and while driving
                       (about 3 m of room ahead)
-    LB       imu      gravity at rest, magnetometer strength, and compass
+    LB   [Z] imu      gravity at rest, magnetometer strength, and compass
                       heading against the gyro through a full left circle
                       (about 1 m of room around the car)
-    RB       matrix   checkerboard, border, a counter, scrolling text, then
+    RB   [/] matrix   checkerboard, border, a counter, scrolling text, then
                       the text held without resending; watch the matrix
                       (RacecarSim: Settings, Show dot matrix)
-    Y        print the menu again
-    Triggers and left joystick drive the car between sections.
+    LJOY [5] led      rainbow chase, one LED walking from 0 (front-left end) to
+                      83 (front-right end), solid blue, then clear; watch the
+                      light band
+    Y    [4] print the menu again
+    Triggers and left joystick (RacecarSim: Shift keys and WASD) drive the car
+    between sections.
 
 Expected Outcome: every check in the chosen section prints PASS.
 """
 
 import argparse
+import colorsys
 import math
 import os
 import signal
@@ -339,23 +345,87 @@ class MatrixSection(Section):
         return True
 
 
+class LedSection(Section):
+    """Checks the LED API, then shows a rainbow chase, a walking LED, solid blue, and clear."""
+
+    title = "led: LED strip colors and order"
+    STEPS = [
+        (0.0, "chase", "a rainbow moving along the band"),
+        (4.0, "walk", "one white LED from the front-left end, around the rear, to the front-right end"),
+        (10.5, "blue", "the whole band blue"),
+        (12.5, "clear", "the whole band dark"),
+    ]
+    END = 14.5
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.index = -1
+        r = self.report
+        n = rc.led.get_num_pixels()
+        r.check("84 pixels", n == 84, f"{n}")
+        colors = [(i, 2 * i, 255 - i) for i in range(n)]
+        rc.led.set_pixels(colors)
+        r.check("set_pixels / get_pixels round trip", [tuple(c) for c in rc.led.get_pixels()] == colors)
+        for bad in (n, -1):
+            try:
+                rc.led.set_pixel(bad, (255, 255, 255))
+                r.check(f"set_pixel({bad}) raises IndexError", False)
+            except IndexError:
+                r.check(f"set_pixel({bad}) raises IndexError", True)
+
+    def step(self) -> bool:
+        t = self.elapsed()
+        while self.index + 1 < len(self.STEPS) and t >= self.STEPS[self.index + 1][0]:
+            self.index += 1
+            name, expect = self.STEPS[self.index][1:]
+            print(f"  [{t:5.1f} s] {name}: expect {expect}")
+            if name == "blue":
+                rc.led.set_color((0, 0, 255))
+            elif name == "clear":
+                rc.led.clear()
+        name = self.STEPS[self.index][1]
+        n = rc.led.get_num_pixels()
+        if name == "chase":
+            offset = int(t * 20)
+            rc.led.set_pixels([rainbow((i + offset) % n, n) for i in range(n)])
+        elif name == "walk":
+            lit = min(n - 1, int((t - 4.0) / 6.0 * n))
+            rc.led.set_color((0, 0, 0))
+            rc.led.set_pixel(lit, (255, 255, 255))
+        if t < self.END:
+            return False
+        self.report.check("colors sent", True, "confirm the band showed each step above")
+        return True
+
+
+def rainbow(i: int, n: int) -> Tuple[int, int, int]:
+    """A hue around the color wheel for LED i of n."""
+    r, g, b = colorsys.hsv_to_rgb(i / n, 1, 1)
+    return (int(r * 255), int(g * 255), int(b * 255))
+
+
 SECTIONS: Dict[str, Tuple[Optional[Any], Callable[[], Section]]] = {
     "api": (rc.controller.Button.A, ApiSection),
     "encoder": (rc.controller.Button.B, EncoderSection),
     "power": (rc.controller.Button.X, PowerSection),
     "imu": (rc.controller.Button.LB, ImuSection),
     "matrix": (rc.controller.Button.RB, MatrixSection),
+    "led": (rc.controller.Button.LJOY, LedSection),
 }
 
 active: Optional[Section] = None
 results: List[bool] = []
 
 
+# RacecarSim keyboard keys for the controller buttons (Controller.cs keyboardButtonMap)
+SIM_KEYS = {"A": "1", "B": "2", "X": "3", "Y": "4", "LB": "Z", "RB": "/", "LJOY": "5", "RJOY": "6"}
+
+
 def print_menu() -> None:
-    print("\nSensor and actuator checks. Press:")
+    print("\nSensor and actuator checks. Press (RacecarSim keyboard key in brackets):")
     for name, (button, factory) in SECTIONS.items():
-        print(f"  {button.name:<3} {name:<8} {factory.title}")
-    print("  Y   menu")
+        print(f"  {button.name:<4} [{SIM_KEYS[button.name]}] {name:<8} {factory.title}")
+    print("  Y    [4] menu")
 
 
 def finish() -> None:

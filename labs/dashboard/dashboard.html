@@ -34,6 +34,16 @@
   .matrix span.on { background: #FF3020; box-shadow: 0 0 6px #FF3020; }
   .matrix.small { grid-template-columns: repeat(24, 10px); grid-auto-rows: 10px; gap: 2px; padding: 5px; }
   .matrix.small span { cursor: default; }
+  .ledrow { display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: center; margin-top: 0.6rem; }
+  .ledbar { display: grid; grid-template-columns: repeat(84, 11px); gap: 2px; background: #0E0C0C; padding: 6px; border-radius: 6px; width: max-content; user-select: none; }
+  .ledbar span { height: 22px; border-radius: 3px; background: #000; cursor: pointer; box-shadow: inset 0 0 0 1px #333; }
+  .ledbar.small { grid-template-columns: repeat(84, 8px); }
+  .ledbar.small span { height: 10px; cursor: default; }
+  .ledtools { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; }
+  .ledtools label { margin: 0 0.6rem 0 0; display: flex; align-items: center; gap: 0.4rem; }
+  .ledtools button { background: var(--white); border: 1px solid rgba(35, 31, 32, 0.28); color: var(--tarmac); font: inherit;
+                     padding: 0.35rem 0.8rem; border-radius: 6px; cursor: pointer; }
+  .ledtools button:hover { background: var(--halo); border-color: var(--accent); color: var(--accent); }
   input[type=text] { display: block; width: 100%; max-width: 420px; padding: 0.35rem; margin-top: 0.3rem; font: inherit;
                      border: 1px solid rgba(35, 31, 32, 0.28); border-radius: 6px; }
   .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -149,6 +159,22 @@
         <div class="matrix small" id="matrixState"></div>
       </div>
     </div>
+  </div>
+  <div class="card span3">
+    <h2>LED strip</h2>
+    <div class="legend">Click LEDs to paint them, then Send (set_pixels). LED 0 is the front-left end of the band; 83 the front-right end.</div>
+    <div class="ledrow">
+      <div class="ledbar" id="ledEdit"></div>
+      <div class="ledtools">
+        <label>Color <input type="color" id="ledColor" value="#00a0ff"></label>
+        <button onclick="sendLeds()">Send (set_pixels)</button>
+        <button onclick="editLeds(() => hexColor())">Fill</button>
+        <button onclick="editLeds((c, i) => hueColor(i))">Rainbow</button>
+        <button onclick="editLeds(() => [0, 0, 0])">Clear</button>
+      </div>
+    </div>
+    <div class="legend" style="margin-top:0.8rem">get_pixels(): the last colors set</div>
+    <div class="ledbar small" id="ledState"></div>
   </div>
   <div class="card span2">
     <h2>Drive</h2>
@@ -281,6 +307,42 @@ function showMatrixState(pixels) {
 buildMatrix('matrixEdit', true);
 buildMatrix('matrixState', false);
 
+// LED strip editor: 84 colors, LED 0 first
+const ledColors = Array.from({ length: 84 }, () => [0, 0, 0]);
+let ledDrag = false;
+const rgb = c => `rgb(${c[0]},${c[1]},${c[2]})`;
+function hexColor() {
+  const h = document.getElementById('ledColor').value;
+  return [1, 3, 5].map(i => parseInt(h.substr(i, 2), 16));
+}
+function hueColor(i) {
+  const h = i / 84 * 6, x = 1 - Math.abs(h % 2 - 1);
+  const [r, g, b] = h < 1 ? [1, x, 0] : h < 2 ? [x, 1, 0] : h < 3 ? [0, 1, x] : h < 4 ? [0, x, 1] : h < 5 ? [x, 0, 1] : [1, 0, x];
+  return [r, g, b].map(v => Math.round(v * 255));
+}
+function setLed(i, c) { ledColors[i] = c; document.getElementById('ledEdit').children[i].style.background = rgb(c); }
+function editLeds(f) { for (let i = 0; i < 84; i++) setLed(i, f(ledColors[i], i)); }
+function sendLeds() { post('/leds', { colors: ledColors }); }
+function buildLeds(id, editable) {
+  const el = document.getElementById(id);
+  for (let i = 0; i < 84; i++) {
+    const led = document.createElement('span');
+    led.title = `LED ${i}`;
+    if (editable) {
+      led.addEventListener('pointerdown', e => { e.preventDefault(); ledDrag = true; setLed(i, hexColor()); });
+      led.addEventListener('pointerenter', () => { if (ledDrag) setLed(i, hexColor()); });
+    }
+    el.appendChild(led);
+  }
+}
+addEventListener('pointerup', () => { ledDrag = false; });
+function showLedState(colors) {
+  const leds = document.getElementById('ledState').children;
+  for (let i = 0; i < 84 && i < colors.length; i++) leds[i].style.background = rgb(colors[i]);
+}
+buildLeds('ledEdit', true);
+buildLeds('ledState', false);
+
 const fmt = v => v.map(n => (n >= 0 ? ' ' : '') + n.toFixed(3)).join('  ');
 
 async function poll() {
@@ -312,6 +374,7 @@ async function poll() {
     drawChart('magChart', s.hist, [11, 12, 13], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
     drawCompass(s.heading);
     showMatrixState(s.matrix);
+    showLedState(s.leds);
     const norm = Math.hypot(s.mag[0], s.mag[1], s.mag[2]);
     document.getElementById('mag').textContent = `field ${s.mag.map(v => v.toFixed(2)).join('  ')} uT  |B| ${norm.toFixed(2)}\nheading ${s.heading.toFixed(1)} deg`;
     document.getElementById('imu').textContent = `accel ${fmt(s.accel)}\ngyro  ${fmt(s.gyro)}`;

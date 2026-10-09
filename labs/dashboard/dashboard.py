@@ -143,6 +143,8 @@ def _apply_actions() -> None:
             rc.display.set_matrix(np.array(value, dtype=np.uint8).reshape((8, 24)))
         elif kind == "text":
             rc.display.show_text(value)
+        elif kind == "leds":
+            rc.led.set_pixels([tuple(c) for c in value])
 
 
 def start() -> None:
@@ -192,6 +194,7 @@ def update() -> None:
             "mag": [round(v, 2) for v in mag_ut], "heading": round(heading, 1),
             "scan": scan,
             "matrix": [int(v != 0) for v in np.asarray(rc.display.get_matrix()).flatten()],
+            "leds": [list(c) for c in rc.led.get_pixels()],
             "hist": list(_hist),
         })
 
@@ -233,6 +236,9 @@ class Handler(BaseHTTPRequestHandler):
                 _actions.append(("matrix", pixels + [0] * (192 - len(pixels))))
             elif self.path == "/text":
                 _actions.append(("text", str(data.get("text", ""))[:255]))
+            elif self.path == "/leds":
+                colors = [[max(0, min(255, int(v))) for v in c[:3]] for c in data.get("colors", [])][:84]
+                _actions.append(("leds", colors + [[0, 0, 0]] * (84 - len(colors))))
             elif self.path == "/stop":
                 _cmd["fwd"] = _cmd["turn"] = 0
             else:
