@@ -59,13 +59,16 @@ JPEG_QUALITY = 70
 DEPTH_FAR_M = 4.0
 DEPTH_NEAR_M = 0.15
 DEPTH_FLOOR = 24
+FULL_SPEED_M_S = 4.0  # at speed 1.0 and max speed 1.0
 
 _lock = threading.Lock()
 _state: Dict[str, Any] = {"running": False}
 _color_jpeg = b""
 _depth_jpeg = b""
-_cmd: Dict[str, Any] = {"fwd": 0, "turn": 0, "stamp": 0.0, "speed": 0.5, "angle": 1.0, "max_speed": 0.25,
-                        "max_speed_changed": True}
+_cmd: Dict[str, Any] = {
+    "fwd": 0, "turn": 0, "stamp": 0.0,
+    "speed": 0.5, "angle": 1.0, "max_speed": 0.25, "max_speed_changed": True,
+}
 _hist: Deque[List[float]] = deque()
 # Matrix and LED commands from the browser, applied by update()
 _actions: Deque[Tuple[str, Any]] = deque(maxlen=20)
@@ -84,7 +87,7 @@ def _axis(value: Any) -> int:
 
 
 def _colorize_depth(meters: np.ndarray) -> np.ndarray:
-    """Bright is near, dark is far, black is no return (inferno ramp, as webteleop)."""
+    """Bright is near, dark is far, black is no return (inferno ramp)."""
     valid = meters > 0
     norm = np.clip((meters - DEPTH_NEAR_M) / (DEPTH_FAR_M - DEPTH_NEAR_M), 0.0, 1.0)
     ramp = (DEPTH_FLOOR + (1.0 - norm) * (255 - DEPTH_FLOOR)).astype(np.uint8)
@@ -130,7 +133,7 @@ def _apply_drive() -> Dict[str, float]:
     angle = max(-1.0, min(1.0, turn * cmd["angle"]))
     rc.drive.set_speed_angle(speed, angle)
     return {"speed_cmd": speed, "angle_cmd": angle, "held": float(held and not timed_out),
-            "timed_out": float(timed_out), "target": speed * cmd["max_speed"] * 4.0}
+            "timed_out": float(timed_out), "target": speed * cmd["max_speed"] * FULL_SPEED_M_S}
 
 
 def _apply_actions() -> None:
@@ -227,9 +230,9 @@ class Handler(BaseHTTPRequestHandler):
                 _cmd["turn"] = _axis(data.get("turn", 0))
                 _cmd["stamp"] = time.monotonic()
             elif self.path == "/params":
-                for key, low, high in (("speed", 0.0, 1.0), ("angle", 0.0, 1.0), ("max_speed", 0.0, 1.0)):
+                for key in ("speed", "angle", "max_speed"):
                     if key in data:
-                        _cmd[key] = max(low, min(high, float(data[key])))
+                        _cmd[key] = max(0.0, min(1.0, float(data[key])))
                 _cmd["max_speed_changed"] = "max_speed" in data or _cmd["max_speed_changed"]
             elif self.path == "/matrix":
                 pixels = [1 if v else 0 for v in data.get("pixels", [])][:192]

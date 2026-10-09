@@ -63,8 +63,6 @@
   .state { font-size: 1.3rem; color: var(--white); background: var(--tarmac); border-radius: 8px; padding: 0.9rem 0.6rem; margin-bottom: 0.7rem; text-align: center; }
   .state.moving { background: var(--accent); }
   .state.timeout, .state.offline { background: var(--red); }
-  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; align-items: stretch; }
-  @media (max-width: 900px) { .row2 { grid-template-columns: 1fr; } }
   .pad { display: grid; grid-template-columns: repeat(3, 84px); grid-template-rows: repeat(3, 84px); gap: 8px; justify-content: center; margin: 0.8rem auto;
          touch-action: none; user-select: none; }
   .pad button { font-size: 1.8rem; border-radius: 12px; border: 2px solid var(--tarmac); background: var(--white); color: var(--tarmac); cursor: pointer; }
@@ -74,7 +72,7 @@
   label { display: block; color: rgba(35, 31, 32, 0.6); font-size: 0.8rem; margin-top: 0.6rem; }
   label b { color: var(--carbon); }
   input[type=range] { width: 100%; accent-color: var(--accent); }
-  .card > button, .matrixrow button { background: var(--white); border: 1px solid rgba(35, 31, 32, 0.28); color: var(--tarmac); font: inherit;
+  .matrixrow button { background: var(--white); border: 1px solid rgba(35, 31, 32, 0.28); color: var(--tarmac); font: inherit;
            padding: 0.35rem 0.8rem; border-radius: 6px; margin: 0.8rem 0.4rem 0 0; cursor: pointer; }
   .matrixrow button:hover { background: var(--halo); border-color: var(--accent); color: var(--accent); }
 </style>
@@ -84,7 +82,7 @@
   <div>
     <span class="wordmark">RACECAR Neo</span>
     <h1>Sensor Dashboard</h1>
-    <div class="meta">frame rate: <b id="fps">?</b> fps &bull; speed cmd: <b id="thr">?</b> &bull; angle cmd: <b id="steer">?</b>
+    <div class="meta">frame rate: <b id="fps">?</b> fps &bull; speed cmd: <b id="speedCmd">?</b> &bull; angle cmd: <b id="steer">?</b>
       &bull; encoder: <b id="enc">?</b> m/s</div>
   </div>
   <button onclick="stopCar()" title="Release every button and stop the car">STOP</button>
@@ -194,7 +192,9 @@
 </main>
 <script>
 const held = { fwd: 0, turn: 0 };
-let lidarRange = 4, paramsLoaded = false, lastState = 0;
+let lidarRange = 4, paramsLoaded = false;
+const FULL_SPEED = 4.0;  // m/s at speed 1 and max speed 1
+const XYZ = ['#EC8B48', '#7FC8A9', '#8FB3FF'];
 
 function post(path, body) {
   return fetch(path, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).catch(() => {});
@@ -241,7 +241,7 @@ function drawLidar(scan) {
   document.getElementById('lidarRange').textContent = lidarRange.toFixed(1);
 }
 
-// Line chart of hist columns over the last 10 s, autoscaled with a zero line
+// Line chart of hist columns over the last 10 s, autoscaled; includeZero keeps 0 in range
 function drawChart(id, hist, cols, colors, includeZero = true) {
   const cv = document.getElementById(id), c = cv.getContext('2d'), w = cv.width, h = cv.height;
   c.clearRect(0, 0, w, h);
@@ -279,7 +279,7 @@ function drawCompass(heading) {
   c.fillText('N', 0, -r + 36);
   c.restore();
   c.fillStyle = '#F5F5F7'; c.font = '13px sans-serif'; c.textAlign = 'center';
-  c.fillText(heading.toFixed(1) + '°', w / 2, w - 4);
+  c.fillText(heading.toFixed(1) + ' deg', w / 2, w - 4);
 }
 
 // Dot matrix editor: 192 cells, row-major; click or drag to toggle
@@ -348,7 +348,6 @@ const fmt = v => v.map(n => (n >= 0 ? ' ' : '') + n.toFixed(3)).join('  ');
 async function poll() {
   try {
     const s = await (await fetch('/state', { cache: 'no-store' })).json();
-    lastState = performance.now();
     const st = document.getElementById('state');
     if (!s.running) { st.className = 'state offline'; st.textContent = 'Waiting for user program mode'; return; }
     if (!paramsLoaded) {
@@ -357,21 +356,21 @@ async function poll() {
     }
     document.getElementById('speedVal').textContent = s.speed.toFixed(2);
     document.getElementById('angleVal').textContent = s.angle.toFixed(2);
-    document.getElementById('maxVal').textContent = s.max_speed.toFixed(2) + ` (speed 1 = ${(s.max_speed * 4).toFixed(1)} m/s)`;
+    document.getElementById('maxVal').textContent = s.max_speed.toFixed(2) + ` (speed 1 = ${(s.max_speed * FULL_SPEED).toFixed(1)} m/s)`;
     document.getElementById('fps').textContent = s.fps;
-    document.getElementById('thr').textContent = s.speed_cmd.toFixed(2);
+    document.getElementById('speedCmd').textContent = s.speed_cmd.toFixed(2);
     document.getElementById('steer').textContent = s.angle_cmd.toFixed(2);
     document.getElementById('enc').textContent = s.encoder.toFixed(2);
     st.className = 'state' + (s.timed_out ? ' timeout' : s.held ? ' moving' : '');
     st.textContent = s.timed_out ? 'Command timed out' : `${s.encoder.toFixed(2)} m/s` + (s.held ? ` (target ${s.target.toFixed(2)})` : '');
     drawLidar(s.scan);
     drawChart('encChart', s.hist, [1, 2], ['#F5F5F7', '#EC8B48']);
-    drawChart('accChart', s.hist, [3, 4, 5], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
-    drawChart('gyroChart', s.hist, [6, 7, 8], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
-    document.getElementById('battery').textContent = `${s.volts.toFixed(2)} V • ${s.amps.toFixed(2)} A`;
+    drawChart('accChart', s.hist, [3, 4, 5], XYZ);
+    drawChart('gyroChart', s.hist, [6, 7, 8], XYZ);
+    document.getElementById('battery').textContent = `${s.volts.toFixed(2)} V | ${s.amps.toFixed(2)} A`;
     drawChart('voltChart', s.hist, [9], ['#EC8B48'], false);
     drawChart('ampChart', s.hist, [10], ['#7FC8A9']);
-    drawChart('magChart', s.hist, [11, 12, 13], ['#EC8B48', '#7FC8A9', '#8FB3FF']);
+    drawChart('magChart', s.hist, [11, 12, 13], XYZ);
     drawCompass(s.heading);
     showMatrixState(s.matrix);
     showLedState(s.leds);

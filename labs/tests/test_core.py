@@ -199,7 +199,7 @@ def update():
     if rc.controller.is_down(rc.controller.Button.Y):
         a = rc.physics.get_linear_acceleration()
         w = rc.physics.get_angular_velocity()
-        # REP-103 body axes: x forward, y left, z up (at rest, acceleration z is +9.81)
+        # REP-103 body axes; at rest, acceleration z reads +9.81
         print(
             f"Linear acceleration (x fwd, y left, z up): ({a[0]:5.2f},{a[1]:5.2f},{a[2]:5.2f}); "
             f"Angular velocity (roll, pitch, yaw): ({w[0]:5.2f},{w[1]:5.2f},{w[2]:5.2f})"

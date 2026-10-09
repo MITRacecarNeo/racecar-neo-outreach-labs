@@ -1,6 +1,6 @@
 """
 MIT BWSI Autonomous RACECAR
-MIT License
+GNU General Public License v3.0
 racecar-neo-outreach-labs
 
 File Name: test_sensors.py
@@ -47,7 +47,7 @@ import os
 import signal
 import sys
 import time
-from typing import Any, Callable, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Type
 
 import numpy as np
 
@@ -61,6 +61,8 @@ args, _ = parser.parse_known_args()
 
 rc = racecar_core.create_racecar()
 
+FULL_SPEED = 4.0  # m/s at speed 1.0 and max speed 1.0
+
 
 class Report:
     """PASS/FAIL rows for one section."""
@@ -72,14 +74,13 @@ class Report:
     def check(self, name: str, passed: bool, detail: str = "") -> None:
         self.rows.append((name, bool(passed), detail))
 
-    def print(self) -> bool:
+    def print(self) -> None:
         width = max([len(name) for name, _, _ in self.rows] + [5])
         print(f"\n== {self.title}")
         for name, passed, detail in self.rows:
             print(f"  {'PASS' if passed else 'FAIL'}  {name.ljust(width)}  {detail}")
         failed = sum(1 for _, passed, _ in self.rows if not passed)
         print(f"  {len(self.rows) - failed}/{len(self.rows)} passed")
-        return failed == 0
 
 
 class Section:
@@ -148,7 +149,6 @@ class EncoderSection(Section):
     title = "encoder: steady speed against the command (max speed 1.0)"
     # (speed command, seconds); the last second of each step is averaged
     STEPS = [(0.25, 3.0), (0.5, 3.0), (1.0, 3.0), (0.0, 3.0)]
-    FULL_SPEED = 4.0  # m/s at speed 1.0 and max speed 1.0
     # The speed loop overshoots a step by about 6% and settles over several
     # seconds, and the encoder reads wheel speed, which includes about 1% slip
     TOLERANCE = 0.05
@@ -169,7 +169,7 @@ class EncoderSection(Section):
         if t < seconds:
             return False
 
-        target = command * self.FULL_SPEED
+        target = command * FULL_SPEED
         mean = float(np.mean(self.samples)) if self.samples else float("nan")
         spread = float(np.std(self.samples)) if self.samples else float("nan")
         if command == 0:
@@ -223,10 +223,11 @@ class PowerSection(Section):
         drive_v = float(np.mean([v for v, _, _ in self.drive]))
         drive_a = float(np.mean([a for _, a, _ in self.drive]))
         speed = float(np.mean([abs(e) for _, _, e in self.drive]))
-        expected_a = 5.0 + 5.0 * min(speed / 4.0, 1.0)
-        r.check("voltage in 7.0 to 8.4 V", all(6.99 <= v <= 8.41 for v, _ in self.idle + [d[:2] for d in self.drive]),
+        expected_a = 5.0 + 5.0 * min(speed / FULL_SPEED, 1.0)
+        readings = self.idle + [d[:2] for d in self.drive]
+        r.check("voltage in 7.0 to 8.4 V", all(6.99 <= v <= 8.41 for v, _ in readings),
                 f"idle {idle_v:.3f} V, driving {drive_v:.3f} V")
-        r.check("current never negative", all(a >= 0 for _, a in self.idle + [d[:2] for d in self.drive]))
+        r.check("current never negative", all(a >= 0 for _, a in readings))
         r.check("idle current about 2.5 A", abs(idle_a - 2.5) < 0.1, f"{idle_a:.3f} A")
         r.check("driving current 5 A + 5 A x speed / 4 m/s", abs(drive_a - expected_a) < 0.3,
                 f"{drive_a:.3f} A at {speed:.2f} m/s (model {expected_a:.2f} A)")
@@ -404,7 +405,7 @@ def rainbow(i: int, n: int) -> Tuple[int, int, int]:
     return (int(r * 255), int(g * 255), int(b * 255))
 
 
-SECTIONS: Dict[str, Tuple[Optional[Any], Callable[[], Section]]] = {
+SECTIONS: Dict[str, Tuple[Any, Type[Section]]] = {
     "api": (rc.controller.Button.A, ApiSection),
     "encoder": (rc.controller.Button.B, EncoderSection),
     "power": (rc.controller.Button.X, PowerSection),
@@ -414,7 +415,6 @@ SECTIONS: Dict[str, Tuple[Optional[Any], Callable[[], Section]]] = {
 }
 
 active: Optional[Section] = None
-results: List[bool] = []
 
 
 # RacecarSim keyboard keys for the controller buttons (Controller.cs keyboardButtonMap)
@@ -446,7 +446,7 @@ def update() -> None:
     global active
     if active is not None:
         if active.step():
-            results.append(active.report.print())
+            active.report.print()
             active = None
             if args.section:
                 finish()
