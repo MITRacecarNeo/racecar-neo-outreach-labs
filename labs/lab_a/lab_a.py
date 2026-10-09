@@ -1,6 +1,6 @@
 """
 MIT BWSI Autonomous RACECAR
-MIT License
+GNU General Public License v3.0
 racecar-neo-outreach-labs
 
 File Name: lab_a.py
